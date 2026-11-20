@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "pdfm-mcp": {
+      "command": "/Users/gefaass/.local/bin/pdfm-mcp"
+    }
+  }
+}

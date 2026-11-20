@@ -1,0 +1,11 @@
+{
+  "name": "utad-actividades-pdf",
+  "displayName": "UTAD Actividades PDF",
+  "description": "Produce UTAD class activities for Sistemas Operativos and Fundamentos de Hardware as formatted A4 PDFs with real Parallels VM screenshots via pdfm-mcp.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Haz esta actividad complementaria de Sistemas Operativos en PDF",
+    "Genera el PDF de Fundamentos de Hardware con capturas de la VM",
+    "Revisa y formatea este PDF de actividad de UTAD"
+  ]
+}
