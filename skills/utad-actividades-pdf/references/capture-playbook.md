@@ -62,6 +62,10 @@ last stage (`$ head -n 14`), so print the pipeline manually before running it:
 
 Notes:
 
+- **Guard `prlctl exec` against hangs and collisions (macOS has no `timeout(1)`):** wrap uncertain or initial probes with `perl -e 'alarm 10; exec @ARGV' prlctl exec ...` and do not fire overlapping `prlctl exec` calls at the same VM (concurrent calls fail with `PrlJob_GetRetCode: Invalid argument`).
+- **Use `sudo` inside Linux capture scripts for root-only commands (`cat /etc/netplan/*.yaml`, `resolvectl flush-caches`, `resolvectl statistics`):** running them unprivileged inside `gnome-terminal` pops up a GNOME Polkit password modal that blocks screenshots even after `pkill` or `Escape`. Verify passwordless sudo first (`prlctl exec "$VM" sudo -n true`).
+- **Bound network timeouts and wait on a sentinel file for slow/failing commands:** an un-timeouted `ping` on broken DNS waits ~12 s before printing the error, beating a fixed `sleep 3`. Use `ping -c 1 -W 2`, `dig +time=2 +tries=1`, and `curl --max-time 3`, touch `/home/parallels/.cap_done` right before `sleep 900`, and poll `until prlctl exec "$VM" test -f /home/parallels/.cap_done; do sleep 1; done` before running `vm_capture.py`.
+- **Ubuntu Netplan + `systemd-networkd` vs `NetworkManager` DNS override:** inspect `ls -la /etc/netplan/` first because Netplan merges every `.yaml` file (a leftover `00-installer-config.yaml` with `enp0s5` or DHCP can override or warn). If `resolvectl status eth0` keeps showing DHCP DNS (`10.211.55.1`) after updating `01-netcfg.yaml`, stop `systemd-networkd` / pick one renderer and clear stale leases using `prlctl exec "$VM" bash << 'EOF'` (heredoc avoids host-shell glob issues such as `rm: missing operand`) before `netplan apply`.
 - **After starting or rebooting a VM**, wait until both Parallels Tools and desktop auto-login
   are ready before running `gsettings` or `gnome-terminal`:
   `until prlctl exec "$VM" --current-user whoami >/dev/null 2>&1; do sleep 2; done`
@@ -106,8 +110,8 @@ Notes:
   prlctl exec "$VM" --current-user powershell -NoProfile -WindowStyle Hidden -EncodedCommand "$B64_PS"
   sleep 3 && python3 scripts/vm_capture.py "$VM" fig/raw_fig2.png fig/fig2.png
   ```
-- Keep the `EncodedCommand` launcher short (~500 chars; Parallels `PrlVmGuest_RunProgram` fails
-  on multi-KB command lines).
+- **Never pass nested quotes or `$variables` through inline `powershell -Command '...'`:** `prlctl exec` strips inner double quotes (turning `"Ethernet"` into bareword `Ethernet`). Always use `-EncodedCommand` (`utf-16le`) for both capture scripts and setup/diagnostic PowerShell commands. Keep the `EncodedCommand` launcher short (~500 chars; Parallels `PrlVmGuest_RunProgram` fails on multi-KB command lines).
+- **Keep Windows capture output ordered and clean:** avoid piping native executables (`ping`, `nslookup`) into `Select-String` when display order matters (PowerShell buffering can print `nslookup` before `ping`); use `ping -n 1 -w 1500` directly and pass `-ErrorAction SilentlyContinue` to `Get-DnsClientCache` (which errors after `ipconfig /flushdns` when empty).
 - Never run `Stop-Process -Name powershell` unfiltered (it kills its own session); filter with
   `Get-Process powershell -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID } | Stop-Process`
   or `cmd /c "taskkill /IM powershell.exe /F 2>nul & exit /b 0"`.

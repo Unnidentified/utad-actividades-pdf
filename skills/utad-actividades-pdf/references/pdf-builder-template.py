@@ -7,6 +7,10 @@ Usage
     python3 pdf-builder-template.py -o Gefaell_Inigo_UD2_AC89.pdf \
         --ac 89 --subject "FUNDAMENTOS DE HW" --date 17.11.2026 \
         --author "Iñigo Gefaell"
+    # or for AE / EV deliverables:
+    python3 pdf-builder-template.py -o IMSO_UD2_AE2_Gefaell_Inigo.pdf \
+        --tag AE2 --subject "SISTEMAS OPERATIVOS" --date 20.11.2026 \
+        --author "Iñigo Gefaell"
 
 Edit the STORY section (or import the module and build your own list).
 Everything above STORY is the house style; do not change it casually.
@@ -49,6 +53,7 @@ def fig(path, w_mm, caption):
     ww = w_mm * mm
     t = Table([[Image(path, ww, ww * h / w)], [Paragraph(caption, cap)]], colWidths=[ww])
     t.setStyle(TableStyle([
+        ("NOSPLIT", (0, 0), (-1, -1)),
         ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 1), (0, 1), 8), ("BOTTOMPADDING", (0, 0), (0, 0), 0),
@@ -71,12 +76,12 @@ def tabla(rows, widths_mm):
     return t
 
 
-def portada(c, d, ac, subject, date, authors):
-    """-[ACnn] / grey subject / yellow date + authors in the bottom-right."""
+def portada(c, d, tag, subject, date, authors):
+    """-[ACnn] / -[AEnn] / grey subject / yellow date + authors in the bottom-right."""
     c.saveState()
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 78)
-    c.drawCentredString(W / 2, H * 0.50, "-[AC%s]" % ac)
+    c.drawCentredString(W / 2, H * 0.50, "-[%s]" % tag)
 
     c.setFillColor(colors.HexColor("#8c8c8c"))
     sub = "-    " + subject
@@ -131,20 +136,25 @@ def build_story():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-o", "--out", required=True)
-    ap.add_argument("--ac", required=True, help="number, e.g. 89 for -[AC89]")
+    ap.add_argument("--ac", help="number, e.g. 89 for -[AC89]")
+    ap.add_argument("--tag", help="full cover tag, e.g. AC89, AE2, EV1 (overrides --ac)")
     ap.add_argument("--subject", default="FUNDAMENTOS DE HW",
                     help="FUNDAMENTOS DE HW | SISTEMAS OPERATIVOS")
     ap.add_argument("--date", required=True, help="d.m.yyyy")
     ap.add_argument("--author", action="append", default=[])
     args = ap.parse_args()
 
+    tag = args.tag or (args.ac and ("AC%s" % args.ac))
+    if not tag:
+        ap.error("pass --ac <number> or --tag <tag>")
+
     doc = BaseDocTemplate(args.out, pagesize=A4, leftMargin=M, rightMargin=M,
                           topMargin=M, bottomMargin=M,
-                          title="UD2_AC%s" % args.ac,
+                          title="UD2_%s" % tag,
                           author="; ".join(args.author))
     doc.addPageTemplates([
         PageTemplate(id="Cover", frames=[Frame(M, M, CW, H - 2 * M, id="c")],
-                     onPage=lambda c, d: portada(c, d, args.ac, args.subject,
+                     onPage=lambda c, d: portada(c, d, tag, args.subject,
                                                  args.date, args.author)),
         PageTemplate(id="Body", frames=[Frame(M, M, CW, H - 2 * M, id="b")])])
     doc.build(build_story())

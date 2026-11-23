@@ -112,7 +112,10 @@ voice. State once, at the end, that the captures have to be pasted by hand and w
 ## 4. Environment-specific gotchas
 
 - **Parallels + `prlctl exec`**: `--current-user` for anything graphical on Windows; plain exec
-  is session 0. On Linux, plain exec is root.
+  is session 0. On Linux, plain exec is root. Wrap uncertain `prlctl exec` probes with
+  `perl -e 'alarm 10; exec @ARGV' prlctl exec ...` (macOS lacks `timeout(1)`), serialize calls
+  per VM to avoid `PrlJob_GetRetCode: Invalid argument`, and use `bash << 'EOF'` (Linux) or
+  `powershell -EncodedCommand` (`utf-16le`, Windows) instead of inline quoted commands.
 - **Shared folders**: in Windows they appear as `\\Mac\Home\...` and often as a drive `Z:`; in
   Linux guests usually `/media/psf/...`, but not always mounted. Verify with `ls` before
   relying on them; copying through `prlctl exec ... sh -c 'cat > file'` with stdin always works.

@@ -37,8 +37,10 @@ The user's reference: `assets/cover-reference.png`.
 
 Three elements, nothing else:
 
-1. **Title** `-[ACnn]` — Helvetica-Bold **78 pt**, centred, baseline at `0.50 × H`.
-   The literal characters: hyphen, opening bracket, `AC`, the number, closing bracket.
+1. **Title** `-[ACnn]` (or `-[AEnn]` / `-[EVnn]` when the deliverable is an AE/EV) —
+   Helvetica-Bold **78 pt**, centred, baseline at `0.50 × H`. The literal characters: hyphen,
+   opening bracket, the code and number, closing bracket (`--tag AE2` in
+   `pdf-builder-template.py`).
 2. **Subject line** `-    FUNDAMENTOS DE HW` or `-    SISTEMAS OPERATIVOS` — Helvetica
    **13 pt**, colour `#8C8C8C`, `charSpace = 0.7` (this exact value: more looks wrong), centred,
    baseline at `0.455 × H`. Keep the four spaces after the hyphen so the hyphen sits alone to
@@ -102,6 +104,7 @@ def fig(path, w_mm, txt):
     ww = w_mm * mm
     t = Table([[Image(path, ww, ww*h/w)], [Paragraph(txt, cap)]], colWidths=[ww])
     t.setStyle(TableStyle([
+        ("NOSPLIT", (0, 0), (-1, -1)),
         ("LEFTPADDING",(0,0),(-1,-1),0), ("RIGHTPADDING",(0,0),(-1,-1),0),
         ("TOPPADDING",(0,0),(-1,-1),0),
         ("BOTTOMPADDING",(0,1),(0,1),8), ("BOTTOMPADDING",(0,0),(0,0),0),
@@ -118,6 +121,8 @@ def fig(path, w_mm, txt):
   italic grey. Count figures sequentially across the whole document.
 - One figure per `fig()` call. Two screenshots side by side only when both are wide and short;
   by default stack them.
+- For ReportLab `Drawing()` topology diagrams, offset text labels away from bus/connector lines
+  and verify in rendered page PNGs that no stroke crosses text.
 
 ## Page budget (the arithmetic that decides pagination)
 

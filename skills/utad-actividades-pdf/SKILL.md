@@ -151,8 +151,9 @@ Build with `python3 build.py`, then render every page to PNG (`scripts/render_pa
 
 Run `scripts/check_doc.py build.py` before building to catch banned prose issues early, then run
 `scripts/check_pdf.py <file>.pdf`: it measures the cover margins on the PDF itself and
-scans the text for dashes, banned words, label starts, stray bold, headers and footers. Every
-line must read PASS. Three of its rules are worth knowing before you write, not after: it wants
+scans the text for dashes, banned words, label starts, stray bold, headers and footers. For
+longer multi-capture AE/EV reports pass `--max-pages N` (and `--allow-no-question` if the
+statement has no `?`) instead of skipping `check_pdf.py`. Every line must read PASS. Three of its rules are worth knowing before you write, not after: it wants
 **one caption per image** (a capture that serves two sections is cited in the prose, not
 duplicated), it checks that at least one question (`?`) appears in the body, and it treats bold
 text as body bold only between 9,8 and 10,6 pt, so table headers at 8,5 pt and headings at

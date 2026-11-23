@@ -1,25 +1,38 @@
 #!/usr/bin/env python3
 """Grade a finished PDF against the house rules, with measurements instead of opinions.
 
-Usage: python3 check_pdf.py Apellido_Nombre_UD2_AC12.pdf
+Usage:
+    python3 check_pdf.py Apellido_Nombre_UD2_AC12.pdf
+    python3 check_pdf.py IMSO_UD2_AE2_Gefaell_Inigo.pdf --max-pages 8
 
 Checks the file name, the cover geometry (yellow boxes measured in the PDF), the absence of
 em/en dashes, banned vocabulary, label-colon paragraph starts, bold in body text, headers and
 footers, the AI note (present and with "Nota:" in bold), the figures and captions, and the
 page count. Every line must read PASS before the file is delivered. Exit 1 on any FAIL.
 """
+import argparse
 import re
 import sys
 
 import pymupdf
 
-PDF = sys.argv[1] if len(sys.argv) > 1 else sys.exit("usage: check_pdf.py file.pdf")
+ap = argparse.ArgumentParser()
+ap.add_argument("pdf")
+ap.add_argument("--max-pages", type=int, default=5,
+                help="maximum allowed total pages including cover (default: 5)")
+ap.add_argument("--tag", help="expected cover tag inside -[...], e.g. AC12 or AE2")
+ap.add_argument("--allow-no-question", action="store_true",
+                help="do not fail when body text contains no '?'")
+args = ap.parse_args()
+
+PDF = args.pdf
 doc = pymupdf.open(PDF)
 pages = doc.page_count
 W, H = doc[0].rect.width, doc[0].rect.height
 MM = 72 / 25.4
 
 text = "\n".join(p.get_text() for p in doc)
+cover_text = doc[0].get_text()
 P = []          # (ok, label, detail)
 
 
@@ -27,10 +40,15 @@ def check(ok, label, detail=""):
     P.append((ok, label, detail))
 
 
-# --- filename
+# --- filename (supports Surname_Name_UDx_ACy.pdf and SUBJECT_UDx_AEy_Surname_Name.pdf)
 name = PDF.rsplit("/", 1)[-1]
-check(re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ]+_[A-Za-zÁÉÍÓÚÑáéíóúñ]+_UD\d+_AC\d+(-\d+)?\.pdf", name) is not None,
-      "nombre del archivo", name)
+word = r"[A-Za-zÁÉÍÓÚÑáéíóúñ-]+"
+ud_tag = r"UD\d+_(?:AC|AE|EV)\d+(?:-\d+)?"
+name_ok = re.fullmatch(
+    rf"(?:(?:[A-Z]{{2,6}}_)?{word}_{word}_{ud_tag}|[A-Z]{{2,6}}_{ud_tag}_{word}_{word})\.pdf",
+    name,
+) is not None
+check(name_ok, "nombre del archivo", name)
 
 # --- cover geometry: yellow highlight boxes
 d = doc[0].get_drawings()
@@ -49,15 +67,15 @@ else:
     check(False, "portada: no encuentro los recuadros amarillos", "")
 
 # --- cover title present, subtitle not letter-spaced
-m_ac = re.search(r"AC(\d+)", name)
-if m_ac:
-    ac = m_ac.group(1)
-    check(re.search(r"\[\s*AC\s*" + ac + r"\s*\]", text.replace("\n", " ")) is not None,
-          "portada: título -[AC%s]" % ac, "")
+m_tag = re.search(r"\b(AC|AE|EV)(\d+)\b", args.tag or name.replace("_", " "))
+if m_tag:
+    kind, num = m_tag.group(1), m_tag.group(2)
+    check(re.search(r"\[\s*" + kind + r"\s*" + num + r"\s*\]", cover_text.replace("\n", " ")) is not None,
+          "portada: título -[%s%s]" % (kind, num), "")
 else:
-    check(False, "portada: título -[ACn]", "sin número AC en el nombre del archivo")
-check(re.search(r"1\s?0\s?\.\s?1\s?1\s?\.\s?2\s?0\s?2\s?6", text) is None,
-      "portada: fecha sin interletrado", "")
+    check(False, "portada: título -[ACn/AEn]", "sin código AC/AE/EV en el nombre ni --tag")
+spaced_date = re.search(r"\d\s+\.\s+\d|\d\s+\d\s*\.\s*\d\s+\d\s*\.\s*2\s+0", cover_text) is not None
+check(not spaced_date, "portada: fecha sin interletrado", "")
 check("Iñigo Gefaell" in text, "nombre en la portada", "")
 
 # --- forbidden things in the whole document
@@ -107,14 +125,15 @@ check(note_bold, "«Nota:» en negrita", "")
 
 # --- evidence: at least two images, captions
 imgs = sum(len(p.get_images()) for p in doc)
-caps = re.findall(r"Figura \d+\.", text)
+caps = re.findall(r"Figura \d+(?:\s*\([^)]+\))?\.", text)
 check(imgs >= 2, "capturas reales", "%d imágenes" % imgs)
 check(len(caps) >= 2, "pie de figura", "%d pies" % len(caps))
 check(len(caps) == imgs, "una figura por captura", "%d pies / %d imágenes" % (len(caps), imgs))
 
 # --- answers: the statement's question marks
-check(text.count("?") >= 1, "hay respuesta a la pregunta", "")
-check(pages <= 5, "extensión contenida", "%d páginas" % pages)
+if not args.allow_no_question:
+    check(text.count("?") >= 1, "hay respuesta a la pregunta", "")
+check(pages <= args.max_pages, "extensión contenida (<= %d pág.)" % args.max_pages, "%d páginas" % pages)
 
 print("PDF: %s  (%d páginas, %.0f×%.0f mm)" % (name, pages, W / MM, H / MM))
 bad = 0
