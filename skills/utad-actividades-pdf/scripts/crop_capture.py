@@ -48,17 +48,8 @@ def box_uniformity(im, box, bg, tol=8):
     return hits / max(1, tot)
 
 
-def find_window_box(im, tol=8):
-    """Locate the largest uniform interior rectangle (foreground terminal window)."""
-    w, h = im.size
-    px = im.load()
-    counts = Counter()
-    for y in range(int(h * 0.12), int(h * 0.88), 4):
-        for x in range(int(w * 0.12), int(w * 0.88), 4):
-            r, g, b = px[x, y]
-            counts[(r // 4 * 4, g // 4 * 4, b // 4 * 4)] += 1
-    bg = counts.most_common(1)[0][0]
-
+def _box_for_bg(im, px, w, h, bg, tol):
+    """Compute tight uniform rectangle matching bg."""
     def match(c):
         return abs(c[0] - bg[0]) <= tol and abs(c[1] - bg[1]) <= tol and abs(c[2] - bg[2]) <= tol
 
@@ -75,6 +66,8 @@ def find_window_box(im, tol=8):
         best_y = (cur, h)
 
     y0, y1 = best_y
+    if y1 <= y0:
+        return (0, 0, 0, 0)
     ys = range(y0, y1, max(1, (y1 - y0) // 60))
     col_frac = [sum(1 for y in ys if match(px[x, y])) / len(ys) for x in range(w)]
     best_x, cur = (0, 0), None
@@ -88,7 +81,29 @@ def find_window_box(im, tol=8):
     if cur is not None and w - cur > best_x[1] - best_x[0]:
         best_x = (cur, w)
 
-    return (best_x[0], y0, best_x[1], y1), bg
+    return (best_x[0], y0, best_x[1], y1)
+
+
+def find_window_box(im, tol=8):
+    """Locate the largest uniform interior rectangle (foreground terminal window)."""
+    w, h = im.size
+    px = im.load()
+    counts = Counter()
+    for y in range(int(h * 0.12), int(h * 0.88), 4):
+        for x in range(int(w * 0.12), int(w * 0.88), 4):
+            r, g, b = px[x, y]
+            counts[(r // 4 * 4, g // 4 * 4, b // 4 * 4)] += 1
+
+    # Skip pure/near-black (#000000..#040404) candidates first so dark desktop
+    # wallpapers never mask a real dark terminal (#1e1e1e on Ubuntu, #0c0c0c on Windows).
+    ranked = [c for c, _ in counts.most_common(12) if max(c) > 4]
+    for bg in ranked[:5]:
+        box = _box_for_bg(im, px, w, h, bg, tol)
+        if box[2] - box[0] >= 200 and box[3] - box[1] >= 60 and box_uniformity(im, box, bg, tol) >= 0.70:
+            return box, bg
+
+    bg = counts.most_common(1)[0][0]
+    return _box_for_bg(im, px, w, h, bg, tol), bg
 
 
 def main():

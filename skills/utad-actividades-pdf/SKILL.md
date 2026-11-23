@@ -89,10 +89,10 @@ Extract, in writing (to yourself, not in the PDF):
 - the deliverable format it asks for (captures, table, one-page protocol, document…);
 - the file name it demands (`Apellido_Nombre_UD[X]_AC[n].pdf`);
 - the subject: **Sistemas Operativos** or **Fundamentos de HW**;
-- the AC number, if it appears anywhere (statement, folder name, previous file name).
+- the AC/AE/EV code, if it appears anywhere (statement, folder name, previous file name);
+- any sign-off, reviewer name, team partner, list number `n`, or required date (`Revisado y firmado por`, cover author/date) left blank in the statement.
 
-If the AC number or subject cannot be inferred and the user is present, ask **once**, with
-options, and keep working meanwhile. Never guess silently twice.
+If the code, subject, or required sign-off/reviewer field cannot be inferred and the user is present, ask **once**, with options, and keep working meanwhile. Never guess silently twice.
 
 ### Phase 1 — Detect the environment
 

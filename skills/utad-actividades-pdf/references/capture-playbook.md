@@ -62,7 +62,8 @@ last stage (`$ head -n 14`), so print the pipeline manually before running it:
 
 Notes:
 
-- **Guard `prlctl exec` against hangs and collisions (macOS has no `timeout(1)`):** wrap uncertain or initial probes with `perl -e 'alarm 10; exec @ARGV' prlctl exec ...` and do not fire overlapping `prlctl exec` calls at the same VM (concurrent calls fail with `PrlJob_GetRetCode: Invalid argument`).
+- **Guard `prlctl exec` against hangs, semicolon splitting, and collisions (macOS has no `timeout(1)`):** wrap uncertain or initial probes with `perl -e 'alarm 10; exec @ARGV' prlctl exec ...`, pass multi-command Linux checks via `prlctl exec "$VM" bash << 'EOF'` instead of `bash -c "a; b"` (Parallels can split semicolons and run truncated commands like bare `id` as `root`), and avoid overlapping `prlctl exec` calls at the same VM (never append `&` after `gnome-terminal` — it already returns via IPC).
+- **Ubuntu 24.04/26.04 SSH and config-file hygiene:** `openssh-server` uses systemd socket activation, so stopping SSH requires `systemctl disable --now ssh.socket ssh.service` (not just `ssh.service`). When updating `/etc/security/pwquality.conf` or `login.defs`, edit/comment existing keys in place instead of appending duplicate keys.
 - **Use `sudo` inside Linux capture scripts for root-only commands (`cat /etc/netplan/*.yaml`, `resolvectl flush-caches`, `resolvectl statistics`):** running them unprivileged inside `gnome-terminal` pops up a GNOME Polkit password modal that blocks screenshots even after `pkill` or `Escape`. Verify passwordless sudo first (`prlctl exec "$VM" sudo -n true`).
 - **Bound network timeouts and wait on a sentinel file for slow/failing commands:** an un-timeouted `ping` on broken DNS waits ~12 s before printing the error, beating a fixed `sleep 3`. Use `ping -c 1 -W 2`, `dig +time=2 +tries=1`, and `curl --max-time 3`, touch `/home/parallels/.cap_done` right before `sleep 900`, and poll `until prlctl exec "$VM" test -f /home/parallels/.cap_done; do sleep 1; done` before running `vm_capture.py`.
 - **Ubuntu Netplan + `systemd-networkd` vs `NetworkManager` DNS override:** inspect `ls -la /etc/netplan/` first because Netplan merges every `.yaml` file (a leftover `00-installer-config.yaml` with `enp0s5` or DHCP can override or warn). If `resolvectl status eth0` keeps showing DHCP DNS (`10.211.55.1`) after updating `01-netcfg.yaml`, stop `systemd-networkd` / pick one renderer and clear stale leases using `prlctl exec "$VM" bash << 'EOF'` (heredoc avoids host-shell glob issues such as `rm: missing operand`) before `netplan apply`.
@@ -77,7 +78,7 @@ Notes:
 - `--geometry=100x26` gives a compact window whose text is big relative to the image. A
   maximised window on a 1568 px screen produces 10 pt text that becomes 3 pt once placed in the
   PDF. **Prefer a smaller window over a bigger capture.**
-- Use `prlctl exec "$VM" --current-user pkill -f s1.sh || true` in a separate step (or `;`) before launching a new figure; do not kill `gnome-terminal-server` (it can leave the session unable to open windows until reboot).
+- Use `prlctl exec "$VM" pkill -u parallels -f '/home/parallels/s[1].sh' || true` (root with bracketed `[1]` pattern avoids matching `pkill` itself or hitting `Operation not permitted`) before launching a new figure; do not kill `gnome-terminal-server` (it can leave the session unable to open windows until reboot).
 - Disable idle blanking + enable centered windows once per session:
   `prlctl exec "$VM" --current-user env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gsettings set org.gnome.desktop.session idle-delay 0`,
   `... gsettings set org.gnome.desktop.screensaver lock-enabled false`, and
@@ -96,25 +97,23 @@ Notes:
   frames or partial black bottom scanlines when the VM window is not focused. `vm_capture.py`
   uses in-guest HiDPI `CopyFromScreen`, validates the terminal crop, and retries if needed:
   ```bash
-  B64_PS=$(python3 -c 'import base64
-  s2 = """Clear-Host
-  Write-Output "PS C:\\> hostname"
+  W_ENC=$(python3 -c 'import base64; print(base64.b64encode("[IO.File]::WriteAllText((Join-Path $env:USERPROFILE \"s2.ps1\"), [Console]::In.ReadToEnd())".encode("utf-16le")).decode())')
+  cat << 'PS1' | prlctl exec "$VM" --current-user powershell -NoProfile -WindowStyle Hidden -EncodedCommand "$W_ENC"
+  Clear-Host
+  Write-Output "PS C:\> hostname"
   hostname
-  Write-Output "PS C:\\> whoami"
-  whoami"""
-  launch = f"""Remove-Item -Path "HKCU:\\Console\\%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe" -Force -ErrorAction SilentlyContinue
-  $p = Join-Path $env:USERPROFILE "s2.ps1"
-  [IO.File]::WriteAllText($p, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("{base64.b64encode(s2.encode()).decode()}")))
-  Start-Process powershell -ArgumentList "-NoLogo","-NoExit","-ExecutionPolicy","Bypass","-File",$p"""
-  print(base64.b64encode(launch.encode("utf-16le")).decode())')
-  prlctl exec "$VM" --current-user powershell -NoProfile -WindowStyle Hidden -EncodedCommand "$B64_PS"
+  Write-Output "PS C:\> whoami"
+  whoami
+  PS1
+  L_ENC=$(python3 -c 'import base64; print(base64.b64encode("Remove-Item -Path \"HKCU:\\Console\\%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe\" -Force -ErrorAction SilentlyContinue; Start-Process powershell -ArgumentList \"-NoLogo\",\"-NoExit\",\"-ExecutionPolicy\",\"Bypass\",\"-File\",(Join-Path $env:USERPROFILE \"s2.ps1\")".encode("utf-16le")).decode())')
+  prlctl exec "$VM" --current-user powershell -NoProfile -WindowStyle Hidden -EncodedCommand "$L_ENC"
   sleep 3 && python3 scripts/vm_capture.py "$VM" fig/raw_fig2.png fig/fig2.png
   ```
-- **Never pass nested quotes or `$variables` through inline `powershell -Command '...'`:** `prlctl exec` strips inner double quotes (turning `"Ethernet"` into bareword `Ethernet`). Always use `-EncodedCommand` (`utf-16le`) for both capture scripts and setup/diagnostic PowerShell commands. Keep the `EncodedCommand` launcher short (~500 chars; Parallels `PrlVmGuest_RunProgram` fails on multi-KB command lines).
+- **Never double-encode big `.ps1` payloads inside `-EncodedCommand`:** base64-in-base64 inflates scripts ~3.55x and exceeds Parallels `PrlVmGuest_RunProgram` length limits. Streaming the `.ps1` file over stdin (`$W_ENC` is always ~244 chars) handles scripts of any length in one command without chunked `cmd /c echo` loops.
+- **Never pass nested quotes or `$variables` through inline `powershell -Command '...'`:** `prlctl exec` strips inner double quotes (turning `"Ethernet"` into bareword `Ethernet`). Always use stdin + `-EncodedCommand` (`utf-16le`).
 - **Keep Windows capture output ordered and clean:** avoid piping native executables (`ping`, `nslookup`) into `Select-String` when display order matters (PowerShell buffering can print `nslookup` before `ping`); use `ping -n 1 -w 1500` directly and pass `-ErrorAction SilentlyContinue` to `Get-DnsClientCache` (which errors after `ipconfig /flushdns` when empty).
-- Never run `Stop-Process -Name powershell` unfiltered (it kills its own session); filter with
-  `Get-Process powershell -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID } | Stop-Process`
-  or `cmd /c "taskkill /IM powershell.exe /F 2>nul & exit /b 0"`.
+- Never run `Stop-Process -Name powershell` unfiltered (it kills its own session); use
+  `prlctl exec "$VM" cmd /c "taskkill /IM powershell.exe /F 2>nul & exit /b 0"` (without `--current-user` so elevated windows do not return `ERROR: Access is denied`). When creating scheduled tasks with `schtasks` / `Register-ScheduledTask` that a regular user capture will inspect, set `/RU` or match privilege context so querying them does not hit `Access is denied`.
 - Writing to `C:\Windows\System32\drivers\etc\hosts`, changing IPs or firewall rules needs
   elevation. With UAC prompts disabled an elevated child works silently; with prompts enabled
   the capture of the consent dialog is black (secure desktop), so press *Yes* with
