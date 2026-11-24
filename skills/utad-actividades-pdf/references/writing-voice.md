@@ -1,8 +1,6 @@
 # Writing voice
 
-The document is written by a student for a teacher: Spanish from Spain, first person singular,
-plain words, no decoration. It has to read as if the person who did the lab sat down and
-explained it in five minutes.
+The document should sound like a normal person explaining what they did: Spanish from Spain, first person singular, plain words, neither stiff/over-technical nor forcedly casual or slangy. Read it as if someone sat down and explained the lab naturally in five minutes.
 
 ## The rules that decide everything
 
@@ -29,8 +27,9 @@ architecture untouched. Long sentences survive a perfect vocabulary.
 - Short sentences. One idea each. Full stops are cheaper than commas.
 - Concrete nouns and verbs: *miro*, *cambio*, *quito*, *pego*, *compruebo*, *tarda*, *falla*.
   Not *procedo a*, *realizo la comprobación de*, *efectúo*.
-- Accept the informal connectors that a student really uses: *total que*, *o sea*, *por eso*,
-  *aquí*, *ya está*, *lo típico*. One per paragraph at most; two in a row is a style tic.
+- Use normal, neutral connectors (*así que*, *por eso*, *luego*, *después*). Do not force overly
+  colloquial fillers (*total que*, *o sea*, *lo típico*, *ya está*) or stiff textbook connectors
+  (*en consecuencia*, *por consiguiente*, *de este modo*). Aim for plain, natural Spanish.
 - Admit the mistake when there is one: *una cosa que me comí*, *al principio pensaba que…*.
   It reads honest and it is what the teacher wants to see.
 

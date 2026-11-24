@@ -124,7 +124,8 @@ Rules while doing it:
 
 ### Phase 3 — Write the text
 
-Follow `references/writing-voice.md`. Draft section by section, in the enunciado's order, and
+Follow `references/writing-voice.md`. Draft section by section, in the enunciado's order, in a
+normal, natural Spanish register (neither overly technical/bureaucratic nor forcedly casual), and
 keep each paragraph to one to three sentences, around 15 words each.
 
 For each block the shape is usually:
