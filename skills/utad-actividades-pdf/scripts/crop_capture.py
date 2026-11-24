@@ -94,12 +94,12 @@ def find_window_box(im, tol=8):
             r, g, b = px[x, y]
             counts[(r // 4 * 4, g // 4 * 4, b // 4 * 4)] += 1
 
-    # Skip pure/near-black (#000000..#040404) candidates first so dark desktop
-    # wallpapers never mask a real dark terminal (#1e1e1e on Ubuntu, #0c0c0c on Windows).
-    ranked = [c for c, _ in counts.most_common(12) if max(c) > 4]
+    # Skip pure/near-black and dark-wallpaper shadows (max(c) < 10, e.g. Ubuntu (4,8,0))
+    # so wallpapers never mask a real dark terminal (#1e1e1e Ubuntu, #0c0c0c Windows).
+    ranked = [c for c, _ in counts.most_common(12) if max(c) >= 10]
     for bg in ranked[:5]:
         box = _box_for_bg(im, px, w, h, bg, tol)
-        if box[2] - box[0] >= 200 and box[3] - box[1] >= 60 and box_uniformity(im, box, bg, tol) >= 0.70:
+        if box[2] - box[0] >= 200 and box[3] - box[1] >= 60 and box_uniformity(im, box, bg, tol) >= 0.75:
             return box, bg
 
     bg = counts.most_common(1)[0][0]
@@ -130,9 +130,9 @@ def main():
         box, bg = find_window_box(im)
         unif = box_uniformity(im, box, bg)
         bw, bh = box[2] - box[0], box[3] - box[1]
-        # Pure #000000..#040404 (max(bg) <= 4) matches sleeping screens and black space in wallpapers,
-        # whereas real dark terminals (Ubuntu #1c1c1c, Windows #0c0c0c) have max(bg) >= 12.
-        if bw < 200 or bh < 60 or unif < 0.70 or max(bg) <= 4:
+        # Dark shadows max(bg) < 10 match sleeping screens and dark wallpaper corners (e.g. (4,8,0)),
+        # whereas real dark terminals (Ubuntu #1e1e1e, Windows #0c0c0c) have max(bg) >= 12.
+        if bw < 200 or bh < 60 or unif < 0.75 or max(bg) < 10:
             print("error: no terminal window detected in %s (bg=%s box=%s unif=%.2f)"
                   % (args.src, bg, box, unif), file=sys.stderr)
             if not args.allow_empty:

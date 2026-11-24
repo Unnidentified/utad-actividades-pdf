@@ -40,12 +40,13 @@ def check(ok, label, detail=""):
     P.append((ok, label, detail))
 
 
-# --- filename (supports Surname_Name_UDx_ACy.pdf and SUBJECT_UDx_AEy_Surname_Name.pdf)
+# --- filename (supports Surname_Name_UDx_ACy.pdf, Surname_Name_SUBJECT_UDx_EVy.pdf, and SUBJECT_UDx_AEy_Surname_Name.pdf)
 name = PDF.rsplit("/", 1)[-1]
 word = r"[A-Za-zÁÉÍÓÚÑáéíóúñ-]+"
+subj = r"[A-Z]{2,6}"
 ud_tag = r"UD\d+_(?:AC|AE|EV)\d+(?:-\d+)?"
 name_ok = re.fullmatch(
-    rf"(?:(?:[A-Z]{{2,6}}_)?{word}_{word}_{ud_tag}|[A-Z]{{2,6}}_{ud_tag}_{word}_{word})\.pdf",
+    rf"(?:(?:{subj}_)?{word}_{word}(?:_{subj})?_{ud_tag}|{subj}_{ud_tag}_{word}_{word})\.pdf",
     name,
 ) is not None
 check(name_ok, "nombre del archivo", name)
